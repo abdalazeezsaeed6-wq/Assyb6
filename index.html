@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>نظام إدارة جراحة العيون - مستشفى بن زيلع الحديث</title>
+    <style>
+        :root { --primary: #0284c7; --success: #16a34a; --danger: #dc2626; --warning: #d97706; --bg: #f8fafc; }
+        * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background: var(--bg); margin: 0; padding: 10px; direction: rtl; color: #0f172a; }
+        .card { background: #fff; padding: 14px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); max-width: 550px; margin: 0 auto 10px auto; border: 1px solid #e2e8f0; }
+        h2, h3 { text-align: center; margin: 0 0 10px 0; font-size: 17px; color: #1e293b; }
+        
+        .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-bottom: 10px; }
+        .stat-card { background: #f1f5f9; padding: 6px 2px; border-radius: 8px; text-align: center; border: 1px solid #cbd5e1; }
+        .stat-num { font-size: 15px; font-weight: bold; color: var(--primary); }
+        .stat-label { font-size: 9px; color: #475569; font-weight: 600; }
+
+        .form-group { margin-bottom: 10px; }
+        label { display: block; margin-bottom: 4px; font-size: 12px; font-weight: 600; color: #334155; }
+        input, select, textarea { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; background: #fff; outline: none; }
+        
+        button, .btn-link { display: block; width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; text-align: center; text-decoration: none; box-sizing: border-box; margin-top: 6px; }
+        .btn-main { background: var(--primary); color: #fff; }
+        .btn-sub { background: #64748b; color: #fff; }
+        .btn-save { background: var(--success); color: #fff; }
+        .btn-wa { background: #25D366; color: #fff; }
+        .hidden { display: none !important; }
+        
+        .menu-grid { display: grid; gap: 8px; }
+        .menu-btn { background: #fff; border: 1px solid #cbd5e1; padding: 12px; text-align: right; border-radius: 8px; font-weight: bold; font-size: 14px; color: #334155; display: flex; justify-content: space-between; align-items: center; }
+        
+        .search-row { display: flex; gap: 6px; margin-bottom: 10px; }
+        .patient-box { border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px; margin-bottom: 8px; background: #fff; }
+        .p-head { display: flex; justify-content: space-between; font-weight: bold; color: var(--primary); font-size: 14px; }
+        .p-det { font-size: 12px; color: #475569; margin-top: 3px; }
+        .badge { padding: 2px 6px; border-radius: 4px; font-size: 10px; color: #fff; }
+        .bg-جديد { background: #64748b; }
+        .bg-مقرر { background: var(--warning); }
+        .bg-تم { background: var(--success); }
+        .bg-مؤجل, .bg-ملغى { background: var(--danger); }
+        .action-box { background: #f8fafc; border: 1px dashed #cbd5e1; padding: 8px; border-radius: 8px; margin-top: 6px; }
+        
+        #loader { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.85); display: flex; justify-content: center; align-items: center; font-weight: bold; color: var(--primary); z-index: 99; }
+    </style>
+</head>
+<body>
+
+<div id="loader" class="hidden">جاري معالجة البيانات...</div>
+
+<!-- الشاشة الرئيسية -->
+<div id="mainMenuView" class="card">
+    <h2>شاشة التحكم الرئيسية</h2>
+    
+    <div class="stats-grid">
+        <div class="stat-card"><div class="stat-num" id="stTotal">0</div><div class="stat-label">الإجمالي</div></div>
+        <div class="stat-card"><div class="stat-num" id="stNew" style="color:#64748b">0</div><div class="stat-label">جدد</div></div>
+        <div class="stat-card"><div class="stat-num" id="stPending" style="color:var(--warning)">0</div><div class="stat-label">مقرر</div></div>
+        <div class="stat-card"><div class="stat-num" id="stDone" style="color:var(--success)">0</div><div class="stat-label">منجز</div></div>
+        <div class="stat-card"><div class="stat-num" id="stCanceled" style="color:var(--danger)">0</div><div class="stat-label">مؤجل/ملغى</div></div>
+    </div>
+
+    <button class="btn-main" style="margin-bottom:10px;" onclick="syncData(true)">🔄 تحديث البيانات من السيرفر</button>
+
+    <div class="menu-grid">
+        <button class="menu-btn" onclick="openView('addPatientView')"><span>➕ إضافة مريض جديد</span> <span>❯</span></button>
+        <button class="menu-btn" style="border-color: #0284c7; background: #f0f9ff;" onclick="openView('confirmAppView')"><span>📅 إضافة تأكيد موعد عملية</span> <span>❯</span></button>
+        <button class="menu-btn" onclick="openFilteredList('جديد')"><span>🆕 المرضى الجدد (لم يتم التواصل)</span> <span>❯</span></button>
+        <button class="menu-btn" onclick="openFilteredList('مقرر')"><span>📅 المرضى المقرر لهم عملية</span> <span>❯</span></button>
+        <button class="menu-btn" onclick="openFilteredList('تم')"><span>✅ المرضى تم إنجاز العملية</span> <span>❯</span></button>
+        <button class="menu-btn" onclick="openFilteredList('مؤجل')"><span>⏳ المرضى تم تأجيل العملية</span> <span>❯</span></button>
+        <button class="menu-btn" onclick="openFilteredList('ملغى')"><span>❌ المرضى تم إلغاء العملية</span> <span>❯</span></button>
+    </div>
+</div>
+
+<!-- واجهة إضافة مريض جديد -->
+<div id="addPatientView" class="card hidden">
+    <h3>إضافة مريض جديد</h3>
+    <form id="addForm">
+        <div class="form-group"><label>الاسم الكامل:</label><input type="text" id="f_name" required></div>
+        <div class="form-group"><label>المنطقة:</label><input type="text" id="f_area" required></div>
+        <div class="form-group"><label>الجوال 1:</label><input type="tel" id="f_m1" required placeholder="77XXXXXXXX"></div>
+        <div class="form-group"><label>الجوال 2:</label><input type="tel" id="f_m2"></div>
+        <div class="form-group">
+            <label>العين المتضررة:</label>
+            <select id="f_eye">
+                <option value="R">R (اليمنى)</option>
+                <option value="L">L (اليسرى)</option>
+                <option value="R+L">R+L (العينين)</option>
+            </select>
+        </div>
+        <div class="form-group"><label>نوع العملية:</label><input type="text" id="f_op" value="عملية مياة بيضاء"></div>
+        <div class="form-group"><label>تاريخ التسجيل:</label><input type="date" id="regDate" required></div>
+        <button type="submit" class="btn-save">حفظ المريض (سيحفظ كـ مريض جديد)</button>
+        <button type="button" class="btn-sub" onclick="goHome()">إلغاء وعودة</button>
+    </form>
+</div>
+
+<!-- واجهة إضافة تأكيد موعد عملية -->
+<div id="confirmAppView" class="card hidden">
+    <h3>إضافة تأكيد موعد عملية</h3>
+    <div class="search-row">
+        <input type="text" id="qConfirm" placeholder="البحث باسم المريض أو الجوال...">
+        <button class="btn-main" style="width: 80px;" onclick="searchConfirmPatient()">بحث</button>
+    </div>
+    <div id="confirmSearchOut"></div>
+
+    <div id="confirmStepBox" class="action-box hidden">
+        <h4 id="confPatientName" style="margin:0 0 8px 0; color:var(--primary); text-align:center;"></h4>
+        
+        <div id="appointmentForm">
+            <div class="form-group">
+                <label>تاريخ الحضور:</label>
+                <input type="date" id="appDate" onchange="autoFillDayName(this.value)">
+            </div>
+            <div class="form-group">
+                <label>اليوم:</label>
+                <input type="text" id="appDay" readonly style="background:#f1f5f9;">
+            </div>
+            <div class="form-group">
+                <label>وقت الحضور:</label>
+                <input type="time" id="appTime" value="08:00">
+            </div>
+            <button class="btn-save" onclick="saveAppointment()">1. حفظ البيانات وتحويله لـ (مقرر له عملية)</button>
+            <a id="waDirectBtn" class="btn-link btn-wa hidden" target="_blank">2. إرسال الإشعار عبر الواتساب 📲</a>
+        </div>
+    </div>
+    <button class="btn-sub" onclick="goHome()">عودة للقائمة</button>
+</div>
+
+<!-- واجهة القوائم -->
+<div id="filteredView" class="card hidden">
+    <h3 id="filterTitle">عرض المرضى</h3>
+    <div id="filterOut"></div>
+    <button class="btn-sub" onclick="goHome()">عودة للقائمة</button>
+</div>
+
+<script>
+    // الرابط الجديد الخاص بك
+    const API = "https://script.google.com/macros/s/AKfycbyD6m24Sv0CtVkdmRCdzrUeJh7W_bTZrMrU0X_1suUWuIzvbO7NdlTLWHFCL0-MrqBfnw/exec";
+    let patients = [], currentStatusFilter = '', selectedPatientForApp = null;
+
+    window.onload = () => {
+        document.getElementById('regDate').valueAsDate = new Date();
+        syncData();
+    };
+
+    function loading(b) { document.getElementById('loader').classList.toggle('hidden', !b); }
+
+    function goHome() {
+        document.querySelectorAll('.card').forEach(c => c.classList.add('hidden'));
+        document.getElementById('mainMenuView').classList.remove('hidden');
+        updateDashboard();
+    }
+
+    function openView(id) {
+        document.querySelectorAll('.card').forEach(c => c.classList.add('hidden'));
+        document.getElementById(id).classList.remove('hidden');
+    }
+
+    function syncData(alertUser = false) {
+        loading(true);
+        fetch(API, { method: 'POST', body: JSON.stringify({ action: 'getAllPatients' }) })
+        .then(r => r.json()).then(d => {
+            loading(false);
+            if (d.status === 'success') {
+                patients = d.data;
+                updateDashboard();
+                if (alertUser) alert('تم تحديث البيانات بنجاح!');
+            }
+        }).catch(() => loading(false));
+    }
+
+    function updateDashboard() {
+        document.getElementById('stTotal').innerText = patients.length;
+        document.getElementById('stNew').innerText = patients.filter(p => p.status === 'جديد').length;
+        document.getElementById('stPending').innerText = patients.filter(p => p.status === 'مقرر').length;
+        document.getElementById('stDone').innerText = patients.filter(p => p.status === 'تم').length;
+        document.getElementById('stCanceled').innerText = patients.filter(p => p.status === 'مؤجل' || p.status === 'ملغى').length;
+    }
+
+    // حفظ مريض جديد وضمان تعيينه كـ جديد
+    document.getElementById('addForm').onsubmit = function(e) {
+        e.preventDefault();
+        loading(true);
+        const data = {
+            action: 'addPatient',
+            full_name: document.getElementById('f_name').value,
+            area: document.getElementById('f_area').value,
+            mobile_1: document.getElementById('f_m1').value,
+            mobile_2: document.getElementById('f_m2').value,
+            affected_eye: document.getElementById('f_eye').value,
+            operation_type: document.getElementById('f_op').value,
+            registration_date: document.getElementById('regDate').value
+        };
+
+        fetch(API, { method: 'POST', body: JSON.stringify(data) })
+        .then(r => r.json()).then(d => {
+            loading(false);
+            alert('تم حفظ المريض بنجاح وقيده في قائمة "المرضى الجدد"');
+            document.getElementById('addForm').reset();
+            document.getElementById('regDate').valueAsDate = new Date();
+            syncData();
+            goHome();
+        }).catch(() => loading(false));
+    };
+
+    function searchConfirmPatient() {
+        const q = document.getElementById('qConfirm').value.trim().toLowerCase();
+        const out = document.getElementById('confirmSearchOut');
+        out.innerHTML = '';
+        document.getElementById('confirmStepBox').classList.add('hidden');
+        if (!q) return alert('ادخل اسم المريض للبحث');
+
+        const res = patients.filter(p => p.full_name.toLowerCase().includes(q) || p.mobile_1.toString().includes(q));
+        if (!res.length) return out.innerHTML = '<p style="text-align:center;">لا يوجد مريض بهذا الاسم</p>';
+
+        res.forEach(p => {
+            const div = document.createElement('div');
+            div.className = 'patient-box';
+            div.style.cursor = 'pointer';
+            div.innerHTML = `<div class="p-head"><span>${p.full_name}</span><span class="badge bg-${p.status}">${p.status}</span></div>
+                             <div class="p-det">الجوال: ${p.mobile_1} | العملية: ${p.operation_type}</div>`;
+            div.onclick = () => {
+                selectedPatientForApp = p;
+                document.getElementById('confPatientName').innerText = `تحديد موعد لـ: ${p.full_name}`;
+                document.getElementById('confirmStepBox').classList.remove('hidden');
+                document.getElementById('waDirectBtn').classList.add('hidden');
+                document.getElementById('appDate').valueAsDate = new Date();
+                autoFillDayName(document.getElementById('appDate').value);
+            };
+            out.appendChild(div);
+        });
+    }
+
+    function autoFillDayName(dateStr) {
+        if (!dateStr) return;
+        const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+        document.getElementById('appDay').value = days[new Date(dateStr).getDay()];
+    }
+
+    // حفظ الموعد وتحويل الحالة إلى مقرر + إنشاء رابط الواتساب المباشر
+    function saveAppointment() {
+        const date = document.getElementById('appDate').value;
+        const day = document.getElementById('appDay').value;
+        const time = document.getElementById('appTime').value;
+
+        if (!date || !time) return alert('يرجى تحديد التاريخ والوقت');
+
+        loading(true);
+        const payload = {
+            id: selectedPatientForApp.id,
+            action: 'updateStatus',
+            status: 'مقرر',
+            reason: `موعد العملية: ${day} ${date} الساعة ${time}`
+        };
+
+        fetch(API, { method: 'POST', body: JSON.stringify(payload) })
+        .then(r => r.json()).then(d => {
+            loading(false);
+            alert('تم حفظ الموعد بنجاح وتحويل المريض إلى قائمة "المقرر لهم عملية". يمكنك الآن الضغط على زر إرسال الواتساب.');
+
+            // تجهيز نص ورابط الواتساب المباشر
+            const msg = `الأخ/ت: *${selectedPatientForApp.full_name}*\n` +
+                        `تحية طيبة،،\n` +
+                        `تم تأكيد موعد عمليتكم (*${selectedPatientForApp.operation_type}*) بنجاح.\n\n` +
+                        `📅 *اليوم والتاريخ:* ${day} ${date}\n` +
+                        `⏰ *وقت الحضور:* ${time}\n` +
+                        `👁️ *العين المتضررة:* ${selectedPatientForApp.affected_eye}\n\n` +
+                        `مستشفى بن زيلع الحديث`;
+
+            let phone = selectedPatientForApp.mobile_1.toString().replace(/[^0-9]/g, '');
+            if (!phone.startsWith('967') && phone.length === 9) phone = '967' + phone;
+
+            const waBtn = document.getElementById('waDirectBtn');
+            waBtn.href = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+            waBtn.classList.remove('hidden');
+
+            syncData();
+        }).catch(() => loading(false));
+    }
+
+    function openFilteredList(st) {
+        currentStatusFilter = st;
+        document.getElementById('filterTitle').innerText = 'قائمة المرضى: ' + (st === 'جديد' ? 'المرضى الجدد' : st);
+        openView('filteredView');
+        renderFilteredList();
+    }
+
+    function renderFilteredList() {
+        const out = document.getElementById('filterOut');
+        out.innerHTML = '';
+
+        const res = patients.filter(p => p.status === currentStatusFilter);
+
+        if (!res.length) return out.innerHTML = '<p style="text-align:center; padding: 20px;">لا يوجد مرضى في هذه القائمة</p>';
+
+        res.forEach(p => {
+            const d = document.createElement('div');
+            d.className = 'patient-box';
+            d.innerHTML = `
+                <div class="p-head"><span>${p.full_name}</span><span class="badge bg-${p.status}">${p.status}</span></div>
+                <div class="p-det"><b>المنطقة:</b> ${p.area} | <b>الجوال:</b> ${p.mobile_1}</div>
+                <div class="p-det"><b>العين:</b> ${p.affected_eye} | <b>العملية:</b> ${p.operation_type}</div>
+                ${p.status_reason ? `<div class="p-det" style="color:var(--primary)"><b>الموعد/ملاحظات:</b> ${p.status_reason}</div>` : ''}
+            `;
+            out.appendChild(d);
+        });
+    }
+</script>
+
+</body>
+</html>
